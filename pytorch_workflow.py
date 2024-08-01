@@ -117,3 +117,16 @@ print(y_pred)
 #%% Plotting the predictions
 
 plot_predictions(predictions=y_pred.cpu())
+
+#%% Saving the model
+
+from pathlib import Path
+
+MODEL_PATH = Path("models")
+MODEL_PATH.mkdir(parents=True, exist_ok=True)
+
+MODEL_NAME = "01_pytorch_model"
+MODEL_SAVE_PATH = MODEL_PATH / MODEL_NAME
+
+print(f"Saving model to {MODEL_SAVE_PATH}")
+torch.save(obj = model.state_dict(),f = MODEL_SAVE_PATH)
