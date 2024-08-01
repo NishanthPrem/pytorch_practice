@@ -3,11 +3,12 @@
 import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
+import torch.optim as optim
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-#%% Setting the hyperparameters
+#%% Setting the known parameters
 
 weight = 0.3
 bias = 0.9
@@ -59,4 +60,60 @@ plot_predictions(X_train, y_train, X_test, y_test)
 #%% Creating the LinearRegression
 
 class LinearRegressionCustom(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weights = nn.Parameter(torch.randn(1), requires_grad=True)
+        self.bias = nn.Parameter(torch.randn(1), requires_grad=True)
     
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.weights * x + self.bias
+
+#%% Instantiating the model
+
+model = LinearRegressionCustom().to(device)
+print(model.state_dict())
+
+#%% Setting the hyperparameters
+
+lr = 0.01
+
+loss_fn = nn.L1Loss()
+optimizer = optim.SGD(model.parameters(), lr)
+
+#%% Training the model
+torch.manual_seed(42)
+epochs = 300
+
+X_train = X_train.to(device)
+X_test = X_test.to(device)
+y_train = y_train.to(device)
+y_test = y_test.to(device)
+
+for epoch in range(epochs):
+    model.train()
+    
+    y_pred = model(X_train)
+    loss = loss_fn(y_pred, y_train)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    
+    model.eval()   
+    with torch.inference_mode():
+
+        yt_pred = model(X_test)
+        test_loss = loss_fn(yt_pred, y_test )
+        if epoch % 20 == 0:
+    
+         print(f"Epoch: {epoch} | Train loss: {loss:.3f} | Test loss: {test_loss:.3f}")
+    
+#%% Making the predictions
+
+model.eval()
+with torch.inference_mode():
+    y_pred = model(X_test)
+print(y_pred)
+
+#%% Plotting the predictions
+
+plot_predictions(predictions=y_pred.cpu())
