@@ -15,7 +15,7 @@ from sklearn.datasets import make_moons
 from sklearn.model_selection import train_test_split
 
 n_samples = 1000
-X, y = make_moons(n_samples, random_state=RANDOM_SEED)
+X, y = make_moons(n_samples, noise=0.5, random_state=RANDOM_SEED)
 X = torch.from_numpy(X).type(torch.float)
 y = torch.from_numpy(y).type(torch.float)
 
@@ -94,7 +94,7 @@ for epoch in range(epochs):
 
 model.eval()
 with torch.inference_mode():
-    y_preds = torch.round(torch.sigmoid(model(X_test))).squeeze()
+    y_preds = torch.round(torch.relu(model(X_test))).squeeze()
 
 #%% Plotting the output
 from helper_functions import plot_predictions, plot_decision_boundary
@@ -102,4 +102,11 @@ from helper_functions import plot_predictions, plot_decision_boundary
 plt.figure(figsize=(12, 6))
 plt.subplot(1, 2, 2)
 plt.title("Test")
-plot_decision_boundary(model, X_test, y_test) # model_3 = has non-linearity
+plot_decision_boundary(model, X_test, y_test)
+
+#%% Evaluating metrics
+
+from torchmetrics import Accuracy
+
+acc_fn = Accuracy(task="multiclass", num_classes=2).to(device)
+acc_fn(y_preds, y_test)
