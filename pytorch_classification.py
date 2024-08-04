@@ -49,24 +49,24 @@ class MoonModel(nn.Module):
         
         return self.fc3(x)
 
-model = MoonModel().to(device)
+moon_model = MoonModel().to(device)
 
 #%% Setting up the loss function and optimizer
 
 import torch.optim as optim
 
 loss_fn = nn.BCEWithLogitsLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.3)
+optimizer = optim.SGD(moon_model.parameters(), lr=0.3)
 
 #%% Checking our data
 print("Logits:")
-print(model(X_train.to(device)[:10]).squeeze())
+print(moon_model(X_train.to(device)[:10]).squeeze())
 
 print("Pred Probs:")
-print(torch.sigmoid(model(X_train.to(device)[:10].squeeze())))
+print(torch.sigmoid(moon_model(X_train.to(device)[:10].squeeze())))
 
 print("Pred Labels:")
-print(torch.round(torch.sigmoid(model(X_train.to(device)[:10].squeeze()))))
+print(torch.round(torch.sigmoid(moon_model(X_train.to(device)[:10].squeeze()))))
 
 #%% Evaluating metrics
 
@@ -83,9 +83,9 @@ epochs = 1000
 X_train, y_train = X_train.to(device), y_train.to(device)
 X_test, y_test = X_test.to(device), y_test.to(device)
 
-for epoch in range(epochs):
-    model.train()
-    y_logits = model(X_train).squeeze()
+for epoch in range(1, epochs+1):
+    moon_model.train()
+    y_logits = moon_model(X_train).squeeze()
     y_pred_probs = torch.sigmoid(y_logits)
     y_pred = torch.round(y_pred_probs)
     
@@ -96,9 +96,9 @@ for epoch in range(epochs):
     loss.backward()
     optimizer.step()
     
-    model.eval()
+    moon_model.eval()
     with torch.inference_mode():
-        test_logits = model(X_test).squeeze()
+        test_logits = moon_model(X_test).squeeze()
         test_pred = torch.round(torch.sigmoid(test_logits))
         
         test_loss = loss_fn(test_logits, test_pred)
@@ -150,8 +150,8 @@ def plot_decision_boundary(model, X, y):
 plt.figure(figsize=(12, 6))
 plt.subplot(1, 2, 1)
 plt.title("Train")
-plot_decision_boundary(model, X_train, y_train)
+plot_decision_boundary(moon_model, X_train, y_train)
 plt.subplot(1, 2, 2)
 plt.title("Test")
-plot_decision_boundary(model, X_test, y_test)
+plot_decision_boundary(moon_model, X_test, y_test)
 
