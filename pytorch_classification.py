@@ -1,6 +1,5 @@
 #%% Importing the libraries
 
-import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 
@@ -15,7 +14,7 @@ from sklearn.datasets import make_moons
 from sklearn.model_selection import train_test_split
 
 n_samples = 1000
-X, y = make_moons(n_samples, noise=0.5, random_state=RANDOM_SEED)
+X, y = make_moons(n_samples, noise=0.1, random_state=RANDOM_SEED)
 X = torch.from_numpy(X).type(torch.float)
 y = torch.from_numpy(y).type(torch.float)
 
@@ -24,7 +23,6 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 #%% Visualizing the data
 
-import matplotlib.pyplot as plt
 plt.scatter(x=X[:, 0], 
             y=X[:, 1], 
             c=y, 
@@ -37,9 +35,9 @@ import torch.nn as nn
 class MoonModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(2, 5)
-        self.fc2 = nn.Linear(5, 5)
-        self.fc3 = nn.Linear(5, 1)
+        self.fc1 = nn.Linear(2, 20)
+        self.fc2 = nn.Linear(20, 20)
+        self.fc3 = nn.Linear(20, 1)
         
         self.activation = nn.ReLU()
     
@@ -58,7 +56,23 @@ model = MoonModel().to(device)
 import torch.optim as optim
 
 loss_fn = nn.BCEWithLogitsLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.1)
+optimizer = optim.SGD(model.parameters(), lr=0.3)
+
+#%% Checking our data
+print("Logits:")
+print(model(X_train.to(device)[:10]).squeeze())
+
+print("Pred Probs:")
+print(torch.sigmoid(model(X_train.to(device)[:10].squeeze())))
+
+print("Pred Labels:")
+print(torch.round(torch.sigmoid(model(X_train.to(device)[:10].squeeze()))))
+
+#%% Evaluating metrics
+
+from torchmetrics import Accuracy
+
+acc_fn = Accuracy(task="multiclass", num_classes=2).to(device)
 
 #%% Training the data
 
@@ -70,11 +84,13 @@ X_train, y_train = X_train.to(device), y_train.to(device)
 X_test, y_test = X_test.to(device), y_test.to(device)
 
 for epoch in range(epochs):
+    model.train()
     y_logits = model(X_train).squeeze()
+    y_pred_probs = torch.sigmoid(y_logits)
+    y_pred = torch.round(y_pred_probs)
     
-    y_pred = torch.round(torch.sigmoid(y_logits))
     loss = loss_fn(y_logits, y_train)
-    
+    acc = acc_fn(y_pred, y_train.int())
     
     optimizer.zero_grad()
     loss.backward()
@@ -86,27 +102,56 @@ for epoch in range(epochs):
         test_pred = torch.round(torch.sigmoid(test_logits))
         
         test_loss = loss_fn(test_logits, test_pred)
-        
+        test_acc = acc_fn(test_pred, y_test.int())
         if epoch % 100 == 0:
          print(f"Epoch: {epoch} | Train loss: {loss:.3f} | Test loss: {test_loss:.3f}")
 
 #%% Predicting the data
 
-model.eval()
-with torch.inference_mode():
-    y_preds = torch.round(torch.relu(model(X_test))).squeeze()
+import numpy as np
 
-#%% Plotting the output
-from helper_functions import plot_predictions, plot_decision_boundary
+# TK - this could go in the helper_functions.py and be explained there
+def plot_decision_boundary(model, X, y):
+  
+    # Put everything to CPU (works better with NumPy + Matplotlib)
+    model.to("cpu")
+    X, y = X.to("cpu"), y.to("cpu")
+
+    # Source - https://madewithml.com/courses/foundations/neural-networks/ 
+    # (with modifications)
+    x_min, x_max = X[:, 0].min() - 0.1, X[:, 0].max() + 0.1
+    y_min, y_max = X[:, 1].min() - 0.1, X[:, 1].max() + 0.1
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 101), 
+                         np.linspace(y_min, y_max, 101))
+
+    # Make features
+    X_to_pred_on = torch.from_numpy(np.column_stack((xx.ravel(), yy.ravel()))).float()
+
+    # Make predictions
+    model.eval()
+    with torch.inference_mode():
+        y_logits = model(X_to_pred_on)
+
+    # Test for multi-class or binary and adjust logits to prediction labels
+    if len(torch.unique(y)) > 2:
+        y_pred = torch.softmax(y_logits, dim=1).argmax(dim=1) # mutli-class
+    else: 
+        y_pred = torch.round(torch.sigmoid(y_logits)) # binary
+    
+    # Reshape preds and plot
+    y_pred = y_pred.reshape(xx.shape).detach().numpy()
+    plt.contourf(xx, yy, y_pred, cmap=plt.cm.RdYlBu, alpha=0.7)
+    plt.scatter(X[:, 0], X[:, 1], c=y, s=40, cmap=plt.cm.RdYlBu)
+    plt.xlim(xx.min(), xx.max())
+    plt.ylim(yy.min(), yy.max())
+
+#%% Plot decision boundaries for training and test sets
 
 plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Train")
+plot_decision_boundary(model, X_train, y_train)
 plt.subplot(1, 2, 2)
 plt.title("Test")
 plot_decision_boundary(model, X_test, y_test)
 
-#%% Evaluating metrics
-
-from torchmetrics import Accuracy
-
-acc_fn = Accuracy(task="multiclass", num_classes=2).to(device)
-acc_fn(y_preds, y_test)
